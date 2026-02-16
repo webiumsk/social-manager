@@ -3,8 +3,5 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-	plugins: [tailwindcss(), sveltekit()],
-	ssr: {
-		external: ['@libsql/client', '@libsql/linux-x64-musl']
-	}
+	plugins: [tailwindcss(), sveltekit()]
 });
