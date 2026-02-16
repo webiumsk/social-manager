@@ -19,6 +19,6 @@ RUN mkdir -p /app/data /app/data/media && chown -R appuser:appgroup /app
 USER appuser
 ENV NODE_ENV=production PORT=3000 HOST=0.0.0.0
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
-    CMD wget --quiet --tries=1 --spider http://localhost:3000/health || exit 1
+HEALTHCHECK --interval=15s --timeout=5s --retries=5 --start-period=40s \
+    CMD wget --quiet --tries=2 --spider http://127.0.0.1:3000/health || exit 1
 CMD ["node", "build/index.js"]
