@@ -18,26 +18,15 @@ services:
     volumes:
       - app_data:/app/data    # SQLite DB + media uploads persist here
     networks:
-      - passbolt_default      # Must be same network as Traefik (e.g. where Traefik runs)
-      - posthorn
+      - passbolt_default
     restart: unless-stopped
     labels:
-      # If you get 404, check: same network as Traefik; entrypoint names (web/websecure) match your Traefik config
       - "traefik.enable=true"
-      # HTTPS (entrypoint name must match Traefik, often websecure or https)
       - "traefik.http.routers.posthorn-https.entrypoints=websecure"
       - "traefik.http.routers.posthorn-https.rule=Host(`post.dvadsatjeden.org`)"
       - "traefik.http.routers.posthorn-https.tls=true"
       - "traefik.http.routers.posthorn-https.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.posthorn-https.service=posthorn"
-      # HTTP → HTTPS redirect
-      - "traefik.http.routers.posthorn-http.entrypoints=web"
-      - "traefik.http.routers.posthorn-http.rule=Host(`post.dvadsatjeden.org`)"
-      - "traefik.http.routers.posthorn-http.middlewares=posthorn-redirect"
-      - "traefik.http.middlewares.posthorn-redirect.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.posthorn-redirect.redirectscheme.permanent=true"
-      # Service
-      - "traefik.http.services.posthorn.loadbalancer.server.port=3000"
+      - "traefik.http.services.posthorn-https.loadbalancer.server.port=3000"
 
 volumes:
   app_data:
@@ -46,5 +35,3 @@ volumes:
 networks:
   passbolt_default:
     external: true
-  posthorn:
-    name: posthorn_prod
