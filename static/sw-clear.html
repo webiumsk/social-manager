@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8" />
+  <title>Vymazanie Service Worker</title>
+</head>
+<body>
+  <h1>Vymazanie Service Worker</h1>
+  <p>Ak vidíte blank stránku alebo chybu "Failed to load main.ts", starý Service Worker môže blokovať aplikáciu.</p>
+  <button id="unregister">Odstrániť Service Worker a obnoviť</button>
+  <script>
+    document.getElementById('unregister').onclick = async () => {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of regs) await reg.unregister();
+      }
+      window.location.href = '/';
+    };
+  </script>
+</body>
+</html>
