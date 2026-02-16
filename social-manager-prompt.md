@@ -1,10 +1,10 @@
-# Social Manager — Cursor Project Prompt
+# Posthorn — Cursor Project Prompt
 
 ## Project Overview
 
-Build a multi-user web application called **"Social Manager"** for managing and publishing social media posts across multiple platforms from a single interface.
+Build a multi-user web application called **"Posthorn"** for managing and publishing social media posts across multiple platforms from a single interface. Production URL: `https://post.dvadsatjeden.org`. Source repo: `https://github.com/webiumsk/social-manager`.
 
-The app is built with SvelteKit and can run locally or be deployed to the cloud. It supports multiple users, each with their own brand profiles, platform connections, and post history. Authentication is handled by Better Auth.
+The app is built with SvelteKit and can run locally or be deployed via Docker. It supports multiple users, each with their own brand profiles, platform connections, and post history. Authentication is handled by Better Auth.
 
 ---
 
@@ -12,7 +12,7 @@ The app is built with SvelteKit and can run locally or be deployed to the cloud.
 
 - **Framework:** SvelteKit (latest, with TypeScript)
 - **Styling:** Tailwind CSS v4 with @tailwindcss/typography plugin
-- **Database:** SQLite via Drizzle ORM + libSQL (switchable to Turso for cloud)
+- **Database:** SQLite via Drizzle ORM + `better-sqlite3` (native, synchronous, no bundling issues). WAL mode enabled for concurrent reads.
 - **Authentication:** Better Auth (`better-auth` package) with email/password. Uses `better-auth/svelte-kit` integration and `sveltekitCookies` plugin.
 - **AI:** Multi-provider support — OpenAI-compatible API layer supporting Anthropic, OpenAI, Google, Groq, Mistral, OpenRouter, and local Ollama. App also works fully without AI (manual mode).
 - **Icons:** Lucide icons (`lucide-svelte`)
@@ -198,6 +198,71 @@ export const aiUsage = sqliteTable('ai_usage', {
 });
 ```
 
+### Database Connection (`src/lib/server/db/index.ts`)
+
+**IMPORTANT:** Use `better-sqlite3`, NOT `@libsql/client`. libSQL has dynamic require issues that break SvelteKit adapter-node production builds in Docker.
+
+```ts
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import Database from 'better-sqlite3';
+import { mkdirSync } from 'node:fs';
+import path from 'node:path';
+import * as schema from './schema';
+import { env } from '$env/dynamic/private';
+
+if (!env.DATABASE_URL) throw new Error('DATABASE_URL is not set');
+
+const filePath = env.DATABASE_URL.replace(/^file:\/\//, '').replace(/^file:/, '').trim();
+const fullPath = path.isAbsolute(filePath) ? filePath : path.join(process.cwd(), filePath);
+const dir = path.dirname(fullPath);
+
+try {
+	mkdirSync(dir, { recursive: true });
+} catch {
+	// ignore if already exists
+}
+
+const sqlite = new Database(fullPath);
+sqlite.pragma('journal_mode = WAL');
+sqlite.pragma('foreign_keys = ON');
+
+export const db = drizzle(sqlite, { schema });
+```
+
+Install: `npm install better-sqlite3 drizzle-orm && npm install -D @types/better-sqlite3`
+
+Do NOT install `@libsql/client` — it causes `Could not dynamically require "@libsql/linux-x64-musl"` errors in production.
+
+### Vite Config (`vite.config.ts`)
+
+```ts
+import tailwindcss from '@tailwindcss/vite';
+import { sveltekit } from '@sveltejs/kit/vite';
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+	plugins: [tailwindcss(), sveltekit()]
+});
+```
+
+Keep this clean — no `ssr.external` needed with `better-sqlite3`.
+
+### SvelteKit Config (`svelte.config.js`)
+
+```js
+import adapter from '@sveltejs/adapter-node';
+
+const config = {
+	kit: {
+		adapter: adapter()
+	}
+};
+
+export default config;
+```
+
+Default output directory (`build/`). Do NOT change `out` — the Dockerfile and deploy.sh depend on this path.
+
 ---
 
 ## Authentication Setup (Better Auth)
@@ -302,7 +367,7 @@ src/
 │   ├── server/
 │   │   ├── auth.ts                 # Better Auth config
 │   │   ├── db/
-│   │   │   ├── index.ts            # libSQL/Drizzle connection
+│   │   │   ├── index.ts            # better-sqlite3/Drizzle connection
 │   │   │   └── schema.ts           # Drizzle schema
 │   │   ├── ai/
 │   │   │   ├── index.ts            # Main adapt() function
@@ -922,7 +987,9 @@ GET  /api/billing/usage            — Current month usage breakdown
 
 ---
 
-## Environment Variables (.env)
+## Environment & Configuration Files
+
+### `.env` (local development — Git-ignored)
 
 ```
 # Database
@@ -932,38 +999,338 @@ DATABASE_URL=file:./data/social-manager.db
 BETTER_AUTH_SECRET=           # openssl rand -base64 32
 BETTER_AUTH_URL=http://localhost:5173
 
-# Default AI provider (optional fallback — users configure their own in Settings)
-# If set, new users get this provider pre-configured
+# Default AI provider (optional — users configure their own in Settings)
 AI_PROVIDER=                  # anthropic, openai, google, groq, mistral, openrouter, ollama, custom
-AI_API_KEY=                   # API key for the default provider
-AI_MODEL=                     # Model name (e.g., claude-sonnet-4-5-20250514, gpt-4o, gemini-2.5-flash)
-AI_ENDPOINT=                  # Only needed for custom/ollama (e.g., http://localhost:11434/v1/chat/completions)
+AI_API_KEY=
+AI_MODEL=                     # e.g., claude-sonnet-4-5-20250514, gpt-4o, gemini-2.5-flash
+AI_ENDPOINT=                  # Only for custom/ollama (e.g., http://localhost:11434/v1/chat/completions)
 
 # Billing — Lightning (SatFlux)
 SATFLUX_API_URL=https://api.satflux.io
-SATFLUX_API_KEY=              # Your SatFlux API key for creating invoices
-SATFLUX_WEBHOOK_SECRET=       # Webhook signature verification secret
+SATFLUX_API_KEY=
+SATFLUX_WEBHOOK_SECRET=
 
 # Billing — Stripe (fiat fallback)
 STRIPE_SECRET_KEY=sk_...
 STRIPE_PUBLISHABLE_KEY=pk_...
 STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_PRICE_PRO_MONTHLY=    # Stripe Price ID for Pro monthly
-STRIPE_PRICE_PRO_YEARLY=     # Stripe Price ID for Pro yearly
-STRIPE_PRICE_TEAM_MONTHLY=   # Stripe Price ID for Team monthly
-STRIPE_PRICE_TEAM_YEARLY=    # Stripe Price ID for Team yearly
+STRIPE_PRICE_PRO_MONTHLY=
+STRIPE_PRICE_PRO_YEARLY=
+STRIPE_PRICE_TEAM_MONTHLY=
+STRIPE_PRICE_TEAM_YEARLY=
 
-# Self-hosted mode — set to 'true' to disable billing and unlock all features
-SELF_HOSTED=false
+# Self-hosted mode — 'true' disables billing and unlocks all features
+SELF_HOSTED=true
+
+# OAuth App Credentials (for Quick Connect — shared across all users)
+X_CLIENT_ID=
+X_CLIENT_SECRET=
+LINKEDIN_CLIENT_ID=
+LINKEDIN_CLIENT_SECRET=
+FACEBOOK_APP_ID=
+FACEBOOK_APP_SECRET=
 ```
 
-Individual AI and platform credentials are stored per-user in the DB. The .env values above are optional fallbacks for self-hosted single-user setups.
+### `.env.production` (production — Git-ignored, lives on server at `/opt/posthorn/`)
+
+```
+DATABASE_URL=file:/app/data/social-manager.db
+BETTER_AUTH_SECRET=           # openssl rand -base64 32
+BETTER_AUTH_URL=https://post.dvadsatjeden.org
+SELF_HOSTED=true
+```
+
+Individual AI and platform credentials are stored per-user in the DB. The .env values are optional fallbacks for self-hosted single-user setups.
+
+### `.gitignore` must include:
+
+```
+.env
+.env.production
+data/
+node_modules/
+build/
+.svelte-kit/
+```
+
+---
+
+## Local Development
+
+### Prerequisites
+
+- Node.js 22+ (`node -v`)
+- npm
+
+### Setup
+
+```bash
+git clone https://github.com/webiumsk/social-manager.git
+cd social-manager
+npm install
+cp .env.example .env        # Then fill in BETTER_AUTH_SECRET
+npx drizzle-kit push        # Create/migrate SQLite DB
+npm run dev                  # → http://localhost:5173
+```
+
+### docker-compose.dev.yml (optional — for testing Docker builds locally)
+
+```yaml
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+    container_name: posthorn_dev
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+```
+
+Run with: `docker compose -f docker-compose.dev.yml up --build`
+
+This lets you verify the Docker build works before pushing to production.
+
+---
+
+## Production Deployment (Docker + Traefik)
+
+Production runs on Hetzner server alongside other Docker services (SatFlux, Passbolt, Nostr relay). Traefik handles reverse proxy and SSL.
+
+**Domain:** `post.dvadsatjeden.org`
+**Repo:** `https://github.com/webiumsk/social-manager`
+**Deploy dir:** `/opt/posthorn/`
+
+### Dockerfile (in project root, committed to Git)
+
+```dockerfile
+# Stage 1: Build
+FROM node:22-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+ARG BETTER_AUTH_SECRET
+ENV BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+RUN npm run build
+
+# Stage 2: Run
+FROM node:22-alpine
+WORKDIR /app
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+COPY --from=builder /app/build ./build
+COPY --from=builder /app/package*.json ./
+RUN npm ci --production
+RUN mkdir -p /app/data /app/data/media && chown -R appuser:appgroup /app
+USER appuser
+ENV NODE_ENV=production PORT=3000 HOST=0.0.0.0
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
+  CMD wget --quiet --tries=1 --spider http://localhost:3000/ || exit 1
+CMD ["node", "build/index.js"]
+```
+
+**CRITICAL:** Stage 2 runs `npm ci --production` instead of copying `node_modules` from builder. This ensures `better-sqlite3` native bindings are compiled correctly for the Alpine runtime. Do NOT use `npm prune` + copy approach — it breaks native modules.
+
+### .dockerignore (in project root, committed to Git)
+
+```
+node_modules
+build
+.svelte-kit
+data
+.env
+.env.production
+.git
+.gitignore
+README.md
+```
+
+### docker-compose.yml (in project root, committed to Git — production only)
+
+```yaml
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+    container_name: posthorn_prod
+    env_file:
+      - .env.production
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+    volumes:
+      - app_data:/app/data
+    networks:
+      - passbolt_default
+      - posthorn
+    restart: unless-stopped
+    labels:
+      # HTTPS
+      - "traefik.enable=true"
+      - "traefik.http.routers.posthorn-https.entrypoints=websecure"
+      - "traefik.http.routers.posthorn-https.rule=Host(`post.dvadsatjeden.org`)"
+      - "traefik.http.routers.posthorn-https.tls=true"
+      - "traefik.http.routers.posthorn-https.tls.certresolver=letsencrypt"
+      # HTTP → HTTPS redirect
+      - "traefik.http.routers.posthorn-http.entrypoints=web"
+      - "traefik.http.routers.posthorn-http.rule=Host(`post.dvadsatjeden.org`)"
+      - "traefik.http.routers.posthorn-http.middlewares=posthorn-redirect"
+      - "traefik.http.middlewares.posthorn-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.posthorn-redirect.redirectscheme.permanent=true"
+      # Service
+      - "traefik.http.services.posthorn.loadbalancer.server.port=3000"
+
+volumes:
+  app_data:
+    name: posthorn_data
+
+networks:
+  passbolt_default:
+    external: true
+  posthorn:
+    name: posthorn_prod
+```
+
+### deploy.sh (in project root, committed to Git)
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ─── Config ──────────────────────────────────────────
+REPO="https://github.com/webiumsk/social-manager.git"
+DEPLOY_DIR="/opt/posthorn"
+BRANCH="main"
+APP_NAME="posthorn_prod"
+
+# ─── Colors ──────────────────────────────────────────
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+log()   { echo -e "${GREEN}[DEPLOY]${NC} $1"; }
+warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
+error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
+
+# ─── Pre-checks ─────────────────────────────────────
+cd "$DEPLOY_DIR" || error "Deploy directory $DEPLOY_DIR not found"
+[ -f ".env.production" ] || error ".env.production not found"
+command -v docker >/dev/null 2>&1 || error "Docker not installed"
+command -v docker compose >/dev/null 2>&1 || error "Docker Compose not installed"
+
+# ─── Pull latest code ───────────────────────────────
+if [ -d ".git" ]; then
+    log "Pulling latest from $BRANCH..."
+    git fetch origin
+    git reset --hard "origin/$BRANCH"
+    git clean -fd
+else
+    log "Cloning repository..."
+    cd /tmp
+    git clone --branch "$BRANCH" "$REPO" posthorn_clone
+    cp -r posthorn_clone/* posthorn_clone/.* "$DEPLOY_DIR/" 2>/dev/null || true
+    rm -rf posthorn_clone
+    cd "$DEPLOY_DIR"
+fi
+
+# ─── Load BETTER_AUTH_SECRET for build arg ───────────
+export $(grep -v '^#' .env.production | grep BETTER_AUTH_SECRET | xargs)
+[ -n "${BETTER_AUTH_SECRET:-}" ] || error "BETTER_AUTH_SECRET not set in .env.production"
+
+# ─── Build & Deploy ─────────────────────────────────
+log "Building Docker image..."
+docker compose build --no-cache
+
+log "Stopping old container..."
+docker compose down --remove-orphans 2>/dev/null || true
+
+log "Starting new container..."
+docker compose up -d
+
+# ─── Healthcheck ─────────────────────────────────────
+log "Waiting for healthcheck..."
+sleep 5
+
+for i in $(seq 1 12); do
+    STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$APP_NAME" 2>/dev/null || echo "unknown")
+    if [ "$STATUS" = "healthy" ]; then
+        log "Container is healthy!"
+        break
+    fi
+    if [ "$i" -eq 12 ]; then
+        warn "Healthcheck timeout — check logs: docker logs $APP_NAME"
+    fi
+    sleep 5
+done
+
+# ─── Cleanup ─────────────────────────────────────────
+log "Cleaning up old Docker images..."
+docker image prune -f >/dev/null 2>&1
+
+# ─── Status ──────────────────────────────────────────
+echo ""
+log "═══════════════════════════════════════"
+log "  Posthorn deployed successfully!"
+log "  URL: https://post.dvadsatjeden.org"
+log "  Logs: docker logs -f $APP_NAME"
+log "═══════════════════════════════════════"
+```
+
+### First-time server setup
+
+```bash
+# 1. Create deploy directory
+mkdir -p /opt/posthorn
+cd /opt/posthorn
+
+# 2. Clone repo
+git clone https://github.com/webiumsk/social-manager.git .
+
+# 3. Create .env.production (this file is NOT in Git)
+cat > .env.production << EOF
+DATABASE_URL=file:/app/data/social-manager.db
+BETTER_AUTH_SECRET=$(openssl rand -base64 32)
+BETTER_AUTH_URL=https://post.dvadsatjeden.org
+SELF_HOSTED=true
+EOF
+
+# 4. Make deploy script executable
+chmod +x deploy.sh
+
+# 5. DNS: A record for post.dvadsatjeden.org → server IP
+
+# 6. Deploy
+./deploy.sh
+```
+
+### Subsequent deploys
+
+After pushing changes to GitHub:
+```bash
+cd /opt/posthorn && ./deploy.sh
+```
 
 ---
 
 ## Implementation Priority
 
-1. **Project setup** — SvelteKit + Tailwind + Drizzle + libSQL + basic layout
+1. **Project setup** — SvelteKit + Tailwind + Drizzle + better-sqlite3 + basic layout
 2. **Authentication** — Better Auth setup, login/register pages, auth guard, session handling
 3. **Settings page** — AI provider selector, API key input, save to DB per user
 4. **Brand profiles** — CRUD, brand switcher, voice prompt editor
