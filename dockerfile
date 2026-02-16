@@ -20,5 +20,5 @@ USER appuser
 ENV NODE_ENV=production PORT=3000 HOST=0.0.0.0
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
-    CMD wget --quiet --tries=1 --spider http://localhost:3000/ || exit 1
+    CMD wget --quiet --tries=1 --spider http://localhost:3000/health || exit 1
 CMD ["node", "build/index.js"]

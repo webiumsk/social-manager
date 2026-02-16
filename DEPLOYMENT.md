@@ -114,3 +114,66 @@ Po nasadení nastav **BETTER_AUTH_URL** na `https://tvoja-domena.sk` (alebo `htt
 - [ ] Ak je reverse proxy/SSL: `BETTER_AUTH_URL` zodpovedá verejnej URL
 
 Potom by aplikácia mala bežať a prihlásenie (Better Auth) fungovať pod tvojou doménou.
+
+---
+
+## 9. Docker + Traefik: 404 / aplikácia nebeží
+
+Ak pri Docker deployi dostávaš **404** na `https://post.dvadsatjeden.org`:
+
+### A) Overenie, či aplikácia vôbec odpovedá
+
+Na serveri (v `/opt/posthorn` alebo kde beží Docker):
+
+```bash
+# Kontajner beží a je healthy?
+docker ps
+
+# Logy aplikácie (chyby pri štarte, DB, env)
+docker logs posthorn_prod --tail 100
+
+# Odpovedá app vo vnútri kontajnera? (mal by vrátiť "OK")
+docker exec posthorn_prod wget -qO- http://localhost:3000/health
+```
+
+Ak `docker exec ... /health` vráti `OK`, aplikácia beží a 404 ide od **Traefiku** (smerovanie). Ak `/health` zlyhá alebo kontajner padá, rieš chyby v logoch (DATABASE_URL, BETTER_AUTH_SECRET, práva na `data/`).
+
+### B) Traefik musí byť na rovnakej sieti ako Posthorn
+
+Kontajner `posthorn_prod` je v sieti `passbolt_default`. **Traefik musí byť tiež v sieti `passbolt_default`**, inak neuvidí backend a vráti 404 (alebo 502).
+
+```bash
+# V akých sieťach je posthorn
+docker inspect posthorn_prod --format '{{json .NetworkSettings.Networks}}'
+
+# Názov Traefik kontajnera zistiš podľa svojho setupu, potom:
+docker inspect <traefik_container> --format '{{json .NetworkSettings.Networks}}'
+```
+
+Ak Traefik beží v inej sieti (napr. `traefik_default`, `web`), v `docker-compose.yml` zmeň:
+
+```yaml
+networks:
+  - passbolt_default   # ← zmeň na názov siete, kde beží Traefik
+```
+
+a v sekcii `networks:` pridaj túto sieť ako `external: true` (ak už existuje).
+
+### C) Názvy Traefik entrypointov
+
+V `docker-compose.yml` sú nastavené entrypointy **web** (HTTP) a **websecure** (HTTPS). Ak tvoj Traefik používa iné názvy (napr. `http` a `https`), treba zmeniť labely:
+
+- `traefik.http.routers.posthorn-https.entrypoints=websecure` → zmeň na svoj HTTPS entrypoint
+- `traefik.http.routers.posthorn-http.entrypoints=web` → zmeň na svoj HTTP entrypoint
+
+Názvy entrypointov sú v Traefik konfigurácii (napr. `--entrypoints.web.address=:80` a `--entrypoints.websecure.address=:443`).
+
+### D) 504 na iných službách (napr. satflux.io)
+
+**504 Gateway Timeout** znamená, že reverse proxy (Traefik) nedostal včas odpoveď od backendu. Možné príčiny:
+
+- backend (SatFlux alebo iná služba) nebeží alebo padol,
+- backend je príliš pomalý alebo timeout v Traefik je príliš krátky,
+- sieť medzi Traefikom a backendom (napr. iný server / kontajner) je roztrhnutá alebo firewall blokuje.
+
+Riešenie: skontrolovať logy a stav kontajnera/služby pre danú doménu, overiť, že sieť a timeouty sú v poriadku.

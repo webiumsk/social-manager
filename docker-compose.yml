@@ -22,8 +22,9 @@ services:
       - posthorn
     restart: unless-stopped
     labels:
+      # If you get 404, check: same network as Traefik; entrypoint names (web/websecure) match your Traefik config
       - "traefik.enable=true"
-      # HTTPS
+      # HTTPS (entrypoint name must match Traefik, often websecure or https)
       - "traefik.http.routers.posthorn-https.entrypoints=websecure"
       - "traefik.http.routers.posthorn-https.rule=Host(`post.dvadsatjeden.org`)"
       - "traefik.http.routers.posthorn-https.tls=true"
