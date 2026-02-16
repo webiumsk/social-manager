@@ -12,6 +12,9 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - HOST=0.0.0.0
+      # So SvelteKit sees the original HTTPS request (avoids redirect loop behind Traefik)
+      - PROTOCOL_HEADER=x-forwarded-proto
+      - HOST_HEADER=x-forwarded-host
     volumes:
       - app_data:/app/data    # SQLite DB + media uploads persist here
     networks:
