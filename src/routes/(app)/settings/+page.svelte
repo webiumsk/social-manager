@@ -228,8 +228,9 @@
 		<h2 class="mb-4 text-lg font-medium">AI configuration</h2>
 		<div class="grid gap-4 sm:grid-cols-2">
 			<div>
-				<label class="block text-sm text-zinc-400">Provider</label>
+				<label for="settings-provider" class="block text-sm text-zinc-400">Provider</label>
 				<select
+					id="settings-provider"
 					class="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-zinc-100"
 					bind:value={settings.aiProvider}
 				>
@@ -240,8 +241,9 @@
 			</div>
 			{#if settings.aiProvider && settings.aiProvider !== 'none'}
 				<div>
-					<label class="block text-sm text-zinc-400">API key</label>
+					<label for="settings-apikey" class="block text-sm text-zinc-400">API key</label>
 					<input
+						id="settings-apikey"
 						type="password"
 						class="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-zinc-100"
 						placeholder={settings.hasAiKey ? '•••••••• (leave empty to keep)' : ''}
@@ -249,8 +251,9 @@
 					/>
 				</div>
 				<div>
-					<label class="block text-sm text-zinc-400">Endpoint (optional)</label>
+					<label for="settings-endpoint" class="block text-sm text-zinc-400">Endpoint (optional)</label>
 					<input
+						id="settings-endpoint"
 						type="text"
 						class="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-zinc-100"
 						placeholder="https://..."
@@ -258,8 +261,9 @@
 					/>
 				</div>
 				<div>
-					<label class="block text-sm text-zinc-400">Model</label>
+					<label for="settings-model" class="block text-sm text-zinc-400">Model</label>
 					<input
+						id="settings-model"
 						type="text"
 						class="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-zinc-100"
 						bind:value={settings.aiModel}
@@ -468,9 +472,10 @@
 									{/if}
 									{#each PLATFORM_CREDENTIAL_FIELDS[platform.id] as field}
 										<div>
-											<label class="block text-xs text-zinc-500">{field.label}</label>
+											<label for="cred-{platform.id}-{field.key}" class="block text-xs text-zinc-500">{field.label}</label>
 											{#if field.key === 'relays'}
 												<textarea
+													id="cred-{platform.id}-{field.key}"
 													class="mt-0.5 w-full rounded border border-zinc-600 bg-zinc-800 px-2 py-1 text-sm"
 													rows="2"
 													placeholder={field.placeholder}
@@ -478,6 +483,7 @@
 												></textarea>
 											{:else}
 												<input
+													id="cred-{platform.id}-{field.key}"
 													type={field.type ?? 'text'}
 													class="mt-0.5 w-full rounded border border-zinc-600 bg-zinc-800 px-2 py-1 text-sm"
 													placeholder={field.placeholder}
@@ -536,8 +542,9 @@
 		<h2 class="mb-4 text-lg font-medium">Appearance</h2>
 		<div class="flex flex-wrap gap-4">
 			<div>
-				<label class="block text-sm text-zinc-400">Accent color</label>
+				<label for="settings-accent" class="block text-sm text-zinc-400">Accent color</label>
 				<input
+					id="settings-accent"
 					type="color"
 					class="mt-1 h-10 w-20 cursor-pointer rounded border border-zinc-700 bg-zinc-800"
 					bind:value={settings.accentColor}
@@ -545,8 +552,9 @@
 				<span class="ml-2 text-sm text-zinc-500">{settings.accentColor ?? '#7c3aed'}</span>
 			</div>
 			<div>
-				<label class="block text-sm text-zinc-400">Theme</label>
+				<label for="settings-theme" class="block text-sm text-zinc-400">Theme</label>
 				<select
+					id="settings-theme"
 					class="mt-1 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-zinc-100"
 					bind:value={settings.theme}
 				>

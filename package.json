@@ -6,7 +6,7 @@
 	"scripts": {
 		"dev": "mkdir -p data && vite dev",
 		"build": "vite build",
-		"start": "node build/index.js",
+		"start": "node dist/index.js",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",

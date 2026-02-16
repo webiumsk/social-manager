@@ -132,8 +132,9 @@ Only include platforms that are requested.`;
 		<h2 class="mb-4 text-lg font-medium">New brand</h2>
 		<div class="grid gap-4 sm:grid-cols-2">
 			<div>
-				<label class="block text-sm text-zinc-400">Name</label>
+				<label for="brand-name" class="block text-sm text-zinc-400">Name</label>
 				<input
+					id="brand-name"
 					type="text"
 					class="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-zinc-100"
 					placeholder="My brand, Blog..."
@@ -141,8 +142,9 @@ Only include platforms that are requested.`;
 				/>
 			</div>
 			<div class="sm:col-span-2">
-				<label class="block text-sm text-zinc-400">Description (optional)</label>
+				<label for="brand-desc" class="block text-sm text-zinc-400">Description (optional)</label>
 				<input
+					id="brand-desc"
 					type="text"
 					class="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-zinc-100"
 					placeholder="Short context about the brand"
@@ -150,8 +152,9 @@ Only include platforms that are requested.`;
 				/>
 			</div>
 			<div class="sm:col-span-2">
-				<label class="block text-sm text-zinc-400">Voice prompt (AI tone and style)</label>
+				<label for="brand-voice" class="block text-sm text-zinc-400">Voice prompt (AI tone and style)</label>
 				<textarea
+					id="brand-voice"
 					class="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 font-mono text-sm text-zinc-100"
 					rows="12"
 					bind:value={voicePrompt}
@@ -229,24 +232,27 @@ Only include platforms that are requested.`;
 						<li class="rounded-lg border border-zinc-700 bg-zinc-800/80 p-4">
 							<div class="grid gap-2 sm:grid-cols-2">
 								<div>
-									<label class="block text-xs text-zinc-500">Name</label>
+									<label for="edit-name-{b.id}" class="block text-xs text-zinc-500">Name</label>
 									<input
+										id="edit-name-{b.id}"
 										type="text"
 										class="mt-0.5 w-full rounded border border-zinc-600 bg-zinc-800 px-2 py-1.5 text-sm"
 										bind:value={editName}
 									/>
 								</div>
 								<div class="sm:col-span-2">
-									<label class="block text-xs text-zinc-500">Description</label>
+									<label for="edit-desc-{b.id}" class="block text-xs text-zinc-500">Description</label>
 									<input
+										id="edit-desc-{b.id}"
 										type="text"
 										class="mt-0.5 w-full rounded border border-zinc-600 bg-zinc-800 px-2 py-1.5 text-sm"
 										bind:value={editDescription}
 									/>
 								</div>
 								<div class="sm:col-span-2">
-									<label class="block text-xs text-zinc-500">Voice prompt</label>
+									<label for="edit-voice-{b.id}" class="block text-xs text-zinc-500">Voice prompt</label>
 									<textarea
+										id="edit-voice-{b.id}"
 										class="mt-0.5 w-full rounded border border-zinc-600 bg-zinc-800 px-2 py-1.5 font-mono text-sm"
 										rows="8"
 										bind:value={editVoicePrompt}
