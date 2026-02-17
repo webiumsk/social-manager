@@ -58,11 +58,16 @@ export const auth = betterAuth({
 						await db.update(user).set({ role: 'admin' }).where(eq(user.id, createdUser.id));
 						try {
 							await setAllowPublicRegistration(false);
-						} catch {
-							// app_settings table may be missing in DB; don't break registration
+						} catch (e) {
+							console.error('[auth] setAllowPublicRegistration failed:', e);
 						}
 					}
-					await getOrCreateSubscription(createdUser.id);
+					try {
+						await getOrCreateSubscription(createdUser.id);
+					} catch (e) {
+						console.error('[auth] getOrCreateSubscription failed:', e);
+						throw e;
+					}
 				}
 			}
 		}
