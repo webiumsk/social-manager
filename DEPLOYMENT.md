@@ -168,7 +168,28 @@ V `docker-compose.yml` sú nastavené entrypointy **web** (HTTP) a **websecure**
 
 Názvy entrypointov sú v Traefik konfigurácii (napr. `--entrypoints.web.address=:80` a `--entrypoints.websecure.address=:443`).
 
-### D) 504 na iných službách (napr. satflux.io)
+### D) Registrácia vracia 500
+
+Ak `POST /api/auth/sign-up/email` vráti **500**, často chýba tabuľka **app_settings** v produkčnej DB (používa sa pre „Allow public registration“). Registrácia je upravená tak, aby nepadala ani bez tejto tabuľky, ale aby admin mohol prepínať registráciu v UI, treba tabuľku doplniť.
+
+Na serveri (tam, kde je DB, napr. v volume Posthorn):
+
+```bash
+cd /opt/posthorn
+# Ak máš prístup k DB súboru (napr. v Docker volume), spusti migráciu alebo:
+docker exec posthorn_prod node -e "
+const Database = require('better-sqlite3');
+const path = require('path');
+const dbPath = process.env.DATABASE_URL ? process.env.DATABASE_URL.replace(/^file:\/\//,'').replace(/^file:/,'') : '/app/data/social-manager.db';
+const db = new Database(dbPath.startsWith('/') ? dbPath : path.join('/app', dbPath));
+db.exec(\"CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)\");
+console.log('ok');
+"
+```
+
+Jednoduchšie: ak na serveri máš `npm run db:push` (a DATABASE_URL smeruje na rovnakú DB ako kontajner), spusti tam raz `npm run db:push` a potom znova deploy.
+
+### E) 504 na iných službách (napr. satflux.io)
 
 **504 Gateway Timeout** znamená, že reverse proxy (Traefik) nedostal včas odpoveď od backendu. Možné príčiny:
 
@@ -177,3 +198,44 @@ Názvy entrypointov sú v Traefik konfigurácii (napr. `--entrypoints.web.addres
 - sieť medzi Traefikom a backendom (napr. iný server / kontajner) je roztrhnutá alebo firewall blokuje.
 
 Riešenie: skontrolovať logy a stav kontajnera/služby pre danú doménu, overiť, že sieť a timeouty sú v poriadku.
+
+---
+
+## 10. SSL (HTTPS) za Traefikom
+
+Posthorn má v labele `traefik.http.routers.posthorn-https.tls.certresolver=letsencrypt`. Aby Traefik vystavil certifikát, musí mať **certresolver `letsencrypt`** nakonfigurovaný v **statickej konfigurácii Traefiku** (nie v labele služby).
+
+### Čo skontrolovať v Traefik (passbolt-traefik alebo tvoj Traefik compose)
+
+1. **ACME (Let's Encrypt)** – v konfigurácii Traefiku musí byť niečo v tomto zmysle (príklad pre súbor alebo command):
+
+   **Súbor (napr. `traefik.yml` alebo `static.yml`):**
+   ```yaml
+   certificatesResolvers:
+     letsencrypt:
+       acme:
+         email: tvoj@email.com
+         storage: /letsencrypt/acme.json
+         httpChallenge:
+           entryPoint: web
+   ```
+
+   **Alebo pri spustení (docker run / compose command):**
+   ```text
+   --certificatesresolvers.letsencrypt.acme.email=tvoj@email.com
+   --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+   --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+   ```
+
+2. **Úložisko certifikátov** – adresár `/letsencrypt` (alebo iný) musí byť v Traefik kontajneri namountovaný ako volume, aby `acme.json` prežil reštarty.
+
+3. **Port 80** – pre HTTP-01 challenge musí byť na serveri otvorený port **80** a Traefik musí mať entrypoint `web` na :80. (SatFlux a iné služby to už používajú.)
+
+4. **DNS** – `post.dvadsatjeden.org` musí smerovať (A záznam) na IP servera, kde beží Traefik.
+
+### Rýchla kontrola
+
+- Traefik logy: `docker logs passbolt-traefik-1 2>&1 | grep -i acme` (prípadne iný názov Traefik kontajnera)
+- Ak máš prístup do Traefik dashboardu, v sekcii HTTPS / Certificates skontroluj, či sa objavil certifikát pre `post.dvadsatjeden.org`.
+
+Ak je `letsencrypt` resolver v Traefiku nastavený rovnako ako pre satflux.io, Posthorn by mal dostať certifikát automaticky po prvom HTTPS požiadavke. Ak nie, v logoch Traefiku hľadaj chyby od ACME (napr. „unable to get certificate“).

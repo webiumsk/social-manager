@@ -39,7 +39,12 @@ export const auth = betterAuth({
 					if (!selfHosted) return { data: userData };
 					const [row] = await db.select({ count: count() }).from(user);
 					if ((row?.count ?? 0) === 0) return { data: userData };
-					const allowed = await getAllowPublicRegistration();
+					let allowed = false;
+					try {
+						allowed = await getAllowPublicRegistration();
+					} catch {
+						// app_settings table may be missing; treat as disabled
+					}
 					if (!allowed) {
 						throw new APIError('BAD_REQUEST', {
 							message: 'Public registration is disabled on this instance.'
@@ -51,7 +56,11 @@ export const auth = betterAuth({
 					const [result] = await db.select({ count: count() }).from(user);
 					if (result?.count === 1) {
 						await db.update(user).set({ role: 'admin' }).where(eq(user.id, createdUser.id));
-						await setAllowPublicRegistration(false);
+						try {
+							await setAllowPublicRegistration(false);
+						} catch {
+							// app_settings table may be missing in DB; don't break registration
+						}
 					}
 					await getOrCreateSubscription(createdUser.id);
 				}
