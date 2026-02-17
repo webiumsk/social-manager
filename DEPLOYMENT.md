@@ -170,9 +170,11 @@ Názvy entrypointov sú v Traefik konfigurácii (napr. `--entrypoints.web.addres
 
 ### D) Registrácia vracia 500
 
+**Migrácia pri štarte:** Pri každom štarte kontajnera sa spúšťa `node scripts/migrate-db.js`, ktorý vytvorí všetky potrebné tabuľky (user, session, account, app_settings, atď.), ak ešte neexistujú. Ak si deployol nový image a stále vidíš „no such table“, reštartuj kontajner (alebo jednorazovo `docker exec posthorn_prod node scripts/migrate-db.js`).
+
 Ak `POST /api/auth/sign-up/email` vráti **500**, často chýba tabuľka **app_settings** v produkčnej DB (používa sa pre „Allow public registration“). Registrácia je upravená tak, aby nepadala ani bez tejto tabuľky, ale aby admin mohol prepínať registráciu v UI, treba tabuľku doplniť.
 
-Na serveri (tam, kde je DB, napr. v volume Posthorn):
+Na serveri (tam, kde je DB, napr. v volume Posthorn), ak potrebuješ len doplniť jednu tabuľku:
 
 ```bash
 cd /opt/posthorn
